@@ -1,0 +1,14 @@
+model_size: "7b"
+checkpoint_dir: "checkpoints/7b"
+learning_rate: 1.0e-4
+weight_decay: 0.01
+warmup_steps: 2000
+alignment_batch_size: 16
+pretraining_batch_size: 8
+instruction_batch_size: 4
+log_every: 100
+save_every: 500
+num_workers: 8
+alignment_data_path: "data/alignment"
+pretraining_data_path: "data/pretraining"
+instruction_data_path: "data/instruction"
