@@ -1,0 +1,113 @@
+# Ujamaa-MM-3B Training Config
+# Strategy: LoRA fine-tune on top of Qwen2.5-VL-3B-Instruct
+# This gives you a 3B multimodal model in days, not months.
+# Push to RunPod for the real run; use SmolVLM locally to verify the pipeline.
+
+model:
+  base: "Qwen/Qwen2.5-VL-3B-Instruct"   # pretrained multimodal backbone
+  # Alternative for local testing: "HuggingFaceTB/SmolVLM-500M-Instruct"
+  architecture: ujamaa_lora               # LoRA adapter over HF base
+  ujamaa_dim: 2560                        # Qwen2.5-VL-3B hidden dim
+  anthos_dim: 1536                        # Qwen2.5-1.5B LoRA Anthos hidden dim
+
+lora:
+  r: 64
+  lora_alpha: 128
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  lora_dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+
+# Community gate — Ujamaa's signature: train these from scratch on top of LoRA
+ujamaa_modules:
+  train_community_gate: true     # the novel routing mechanism
+  train_bridge: true             # Anthos projection bridge
+  n_perception_tokens: 16        # perception tokens Anthos sees
+
+datasets:
+  # Phase 1 — text instruction alignment (makes the base follow instructions well)
+  instruction:
+    - name: "HuggingFaceH4/ultrachat_200k"
+      split: train_sft
+      sample: 50000
+      format: chat
+    - name: "HuggingFaceH4/no_robots"
+      split: train
+      sample: 10000
+      format: chat
+
+  # Phase 2 — vision-language alignment
+  vision:
+    - name: "HuggingFaceH4/ultrachat_200k"
+      split: train_sft
+      sample: 10000
+      format: chat
+
+  # Phase 3 — bridge alignment (teach Ujamaa to produce Anthos-digestible output)
+  bridge:
+    - name: "HuggingFaceH4/ultrachat_200k"
+      split: train_sft
+      sample: 20000
+      format: bridge_pairs   # see training/data/bridge_collator.py
+
+training:
+  phases:
+    # instruction phase skipped — Qwen2.5-VL-3B-Instruct is already instruction-tuned
+
+    - name: vision_alignment
+      steps: 3000                  # reduced from 8K to stay under $1.00 on RTX 3090
+      lr: 1.0e-4
+      warmup_steps: 150
+      datasets: [vision]
+      freeze_vision_encoder: false
+
+    - name: bridge_alignment
+      steps: 1000                  # reduced from 3K
+      lr: 5.0e-5
+      warmup_steps: 50
+      datasets: [bridge]
+      freeze_vision_encoder: true
+      freeze_lora: true
+      train_bridge_only: true
+
+  # RunPod settings — optimized for A40 48GB (~$0.44/hr)
+  batch_size: 8                    # 48GB VRAM handles 3B + LoRA comfortably
+  gradient_accumulation: 4         # effective batch = 32
+  max_seq_len: 2048
+  dtype: bfloat16
+  gradient_checkpointing: true
+  save_every_steps: 999999    # only save at the end
+  eval_every_steps: 999999
+
+  # Mac local settings (for pipeline testing only)
+  local_override:
+    batch_size: 1
+    gradient_accumulation: 8
+    dtype: float32
+    base: "HuggingFaceTB/SmolVLM-500M-Instruct"
+    steps_override: 50             # just enough to prove the pipeline runs
+
+optimizer:
+  type: adamw
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.95
+  clip_grad_norm: 1.0
+
+scheduler:
+  type: cosine_with_restarts
+  num_cycles: 1
+
+output:
+  checkpoint_dir: "checkpoints/ujamaa-3b-lora"
+  bridge_checkpoint: "checkpoints/anthos-bridge"
+  logs: "logs/ujamaa-3b"
+  push_to_hub: false              # set true to push adapter to HuggingFace Hub
+  hub_repo: "TushaeBXN/ujamaa-mm-3b"
