@@ -93,6 +93,7 @@ class UjamaaLayer(nn.Module):
         self,
         x: torch.Tensor,
         mask: Optional[torch.Tensor] = None,
+        expert_loader: Optional[callable] = None,
     ) -> Tuple[torch.Tensor, Dict]:
         residual = x
         x = self.norm1(x)
@@ -108,7 +109,7 @@ class UjamaaLayer(nn.Module):
 
         residual = x
         x = self.norm2(x)
-        x = self.moe(x)
+        x = self.moe(x, layer_idx=self.layer_idx, expert_loader=expert_loader)
         x = residual + self.dropout(x)
 
         stats = {
@@ -209,7 +210,7 @@ class UjamaaMultiModal(nn.Module):
 
         layer_stats: List[Dict] = []
         for layer in self.layers:
-            combined, stats = layer(combined, causal_mask)
+            combined, stats = layer(combined, causal_mask, expert_loader=self._expert_loader if hasattr(self, '_expert_loader') else None)
             layer_stats.append(stats)
 
         combined = self.ln_final(combined)
@@ -233,9 +234,15 @@ class UjamaaMultiModal(nn.Module):
         top_k: int = 50,
         pixel_values: Optional[torch.Tensor] = None,
         audio_features: Optional[torch.Tensor] = None,
+        expert_loader: Optional[callable] = None,
     ) -> torch.Tensor:
         self.eval()
         generated = input_ids
+
+        if expert_loader is not None:
+            self._expert_loader = expert_loader
+        else:
+            self._expert_loader = None
 
         for _ in range(max_new_tokens):
             context = generated[:, -self.config.max_seq_len :]

@@ -70,7 +70,7 @@ class MixtureOfExperts(nn.Module):
 
         self._load_balance_loss = torch.tensor(0.0)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, layer_idx: int = 0, expert_loader: Optional[callable] = None) -> torch.Tensor:
         batch, seq, dim = x.shape
 
         router_logits = self.router(x)
@@ -86,6 +86,15 @@ class MixtureOfExperts(nn.Module):
             mask = (top_k_indices == expert_idx).any(dim=-1)
             if mask.any():
                 expert_input = x[mask]
+
+                # Stream expert weights from disk if loader provides them
+                streamed = None
+                if expert_loader is not None:
+                    streamed = expert_loader(layer_idx, expert_idx)
+
+                if streamed is not None:
+                    expert.load_state_dict(streamed)
+
                 expert_output = expert(expert_input)
 
                 slot = (top_k_indices[mask] == expert_idx).nonzero(as_tuple=True)[1]
