@@ -232,15 +232,15 @@ def main():
     processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
     try:
         from transformers import Qwen2_5_VLForConditionalGeneration
-        model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_id, torch_dtype=dtype, trust_remote_code=True)
+        model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_id, dtype=dtype, trust_remote_code=True)
     except (ImportError, Exception):
         try:
             if AutoModelForVision2Seq is not None:
-                model = AutoModelForVision2Seq.from_pretrained(model_id, torch_dtype=dtype, trust_remote_code=True)
+                model = AutoModelForVision2Seq.from_pretrained(model_id, dtype=dtype, trust_remote_code=True)
             else:
                 raise ImportError
         except Exception:
-            model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=dtype, trust_remote_code=True)
+            model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype, trust_remote_code=True)
     model = apply_lora(model, cfg)
     model.print_trainable_parameters()
 
