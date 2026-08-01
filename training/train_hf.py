@@ -61,11 +61,19 @@ def build_datasets(cfg: dict, phase_name: str, processor) -> torch.utils.data.Da
     for ds_cfg in ds_cfgs:
         name = ds_cfg["name"]
         config = ds_cfg.get("config", None)
+        local_path = ds_cfg.get("path", None)
         try:
-            ds = load_dataset(name, config, split=ds_cfg["split"], streaming=False) if config else load_dataset(name, split=ds_cfg["split"], streaming=False)
+            if local_path:
+                ds = load_dataset(name, data_files=local_path, split=ds_cfg.get("split", "train"))
+            elif config:
+                ds = load_dataset(name, config, split=ds_cfg["split"], streaming=False)
+            else:
+                ds = load_dataset(name, split=ds_cfg["split"], streaming=False)
             n = min(ds_cfg.get("sample", len(ds)), len(ds))
             ds = ds.select(range(n))
         except Exception:
+            if local_path:
+                raise
             ds = load_dataset(name, config, split=ds_cfg["split"], streaming=True) if config else load_dataset(name, split=ds_cfg["split"], streaming=True)
             ds = ds.take(ds_cfg.get("sample", 10000))
             from datasets import Dataset

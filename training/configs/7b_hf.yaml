@@ -52,6 +52,12 @@ datasets:
       sample: 20000
       format: bridge_pairs
 
+  identity:
+    - name: "json"
+      path: "data/identity_knowledge.jsonl"
+      split: train
+      format: chat
+
 training:
   phases:
     - name: vision_alignment
@@ -60,6 +66,13 @@ training:
       warmup_steps: 200
       datasets: [vision]
       freeze_vision_encoder: false
+
+    - name: identity_hardening
+      steps: 500
+      lr: 5.0e-5
+      warmup_steps: 25
+      datasets: [identity]
+      freeze_vision_encoder: true
 
     - name: bridge_alignment
       steps: 1000
