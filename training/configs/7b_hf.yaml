@@ -1,0 +1,98 @@
+# Ujamaa-MM-7B Training Config
+# Strategy: LoRA fine-tune on top of Qwen2.5-VL-7B-Instruct
+# RunPod A40 (48GB VRAM) — fits with gradient checkpointing + reduced batch
+# Apache 2.0 license — fully open
+
+model:
+  base: "Qwen/Qwen2.5-VL-7B-Instruct"
+  architecture: ujamaa_lora
+  ujamaa_dim: 3584                        # Qwen2.5-VL-7B hidden dim
+  anthos_dim: 1536                        # Qwen2.5-1.5B LoRA Anthos hidden dim
+
+lora:
+  r: 64
+  lora_alpha: 128
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  lora_dropout: 0.05
+  bias: none
+  task_type: CAUSAL_LM
+
+ujamaa_modules:
+  train_community_gate: true
+  train_bridge: true
+  n_perception_tokens: 16
+
+datasets:
+  instruction:
+    - name: "HuggingFaceH4/ultrachat_200k"
+      split: train_sft
+      sample: 50000
+      format: chat
+    - name: "HuggingFaceH4/no_robots"
+      split: train
+      sample: 10000
+      format: chat
+
+  vision:
+    - name: "HuggingFaceH4/ultrachat_200k"
+      split: train_sft
+      sample: 10000
+      format: chat
+
+  bridge:
+    - name: "HuggingFaceH4/ultrachat_200k"
+      split: train_sft
+      sample: 20000
+      format: bridge_pairs
+
+training:
+  phases:
+    - name: vision_alignment
+      steps: 3000
+      lr: 5.0e-5                          # slightly lower lr for 7B stability
+      warmup_steps: 200
+      datasets: [vision]
+      freeze_vision_encoder: false
+
+    - name: bridge_alignment
+      steps: 1000
+      lr: 2.5e-5
+      warmup_steps: 50
+      datasets: [bridge]
+      freeze_vision_encoder: true
+      freeze_lora: true
+      train_bridge_only: true
+
+  # RunPod A40 48GB — 7B needs tighter memory management
+  batch_size: 4                           # halved from 3B config (8→4)
+  gradient_accumulation: 8                # doubled to keep effective batch=32
+  max_seq_len: 2048
+  dtype: bfloat16
+  gradient_checkpointing: true
+  save_every_steps: 999999
+  eval_every_steps: 999999
+
+optimizer:
+  type: adamw
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.95
+  clip_grad_norm: 1.0
+
+scheduler:
+  type: cosine_with_restarts
+  num_cycles: 1
+
+output:
+  checkpoint_dir: "checkpoints/ujamaa-7b-lora"
+  bridge_checkpoint: "checkpoints/anthos-bridge-7b"
+  logs: "logs/ujamaa-7b"
+  push_to_hub: false
+  hub_repo: "TushaeBXN/ujamaa-mm-7b"
