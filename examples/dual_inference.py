@@ -188,6 +188,10 @@ def anthos_chat(
 
     new_tokens = out[0][input_ids.shape[1]:]
     response = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+
+    import re
+    response = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL).strip()
+
     history.append({"role": "assistant", "content": response})
     return response
 

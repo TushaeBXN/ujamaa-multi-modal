@@ -143,6 +143,11 @@ def chat(model, processor, history: list, user_input: str, image_path: str | Non
 
     new_tokens = output[0][inputs["input_ids"].shape[1]:]
     response = processor.tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+
+    # Strip Qwen's visible thinking blocks — Ujamaa's reasoning stays internal
+    import re
+    response = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL).strip()
+
     history.append({"role": "assistant", "content": [{"type": "text", "text": response}]})
     return response
 
