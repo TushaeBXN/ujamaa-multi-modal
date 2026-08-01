@@ -193,7 +193,7 @@ def train_bridge_phase(ujamaa_model, bridge: AnthosProjectionBridge, dataset, ph
         if step >= phase_cfg["steps"]:
             break
         # Dummy forward for now — replace with real paired Anthos embeddings
-        fake_hidden = torch.randn(1, 32, 2560, torch_dtype=dtype)
+        fake_hidden = torch.randn(1, 32, 2560, dtype=dtype)
         perception = bridge(fake_hidden)
         # Self-supervised: perception tokens should be spread (not collapsed)
         loss = -perception.var(dim=1).mean()
