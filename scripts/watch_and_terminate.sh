@@ -3,16 +3,16 @@
 # Usage: bash scripts/watch_and_terminate.sh
 
 # ── Config ────────────────────────────────────────────────────────────────────
-RUNPOD_HOST="38.147.83.17"
-RUNPOD_PORT="41335"
+RUNPOD_HOST="69.30.85.213"
+RUNPOD_PORT="22129"
 RUNPOD_USER="root"
 SSH_KEY="$HOME/.ssh/id_ed25519"
 REMOTE_DIR="/root/ujamaa-multi-modal"
-CHECKPOINT_SIGNAL="$REMOTE_DIR/checkpoints/ujamaa-3b-lora/final/adapter_config.json"
-BRIDGE_SIGNAL="$REMOTE_DIR/checkpoints/anthos-bridge/bridge.pt"
+CHECKPOINT_SIGNAL="$REMOTE_DIR/checkpoints/ujamaa-7b-lora/final/adapter_config.json"
+BRIDGE_SIGNAL="$REMOTE_DIR/checkpoints/anthos-bridge-7b/bridge.pt"
 LOCAL_SAVE="$HOME/ujamaa-multi-modal/checkpoints"
 POLL_INTERVAL=120   # check every 2 minutes
-RUNPOD_POD_ID="m01ooy2p6hk4ag"  # from your pod URL
+RUNPOD_POD_ID="lyktl52tvacu68"  # from your pod URL
 
 # ── RunPod API key — paste yours here ─────────────────────────────────────────
 RUNPOD_API_KEY="rpa_7MHXAIRDXW1UEMY7UX2AYMYBVM68A5TMCT9546JBwkswyn"   # get from runpod.io/console/user/settings
@@ -32,23 +32,23 @@ check_done() {
 }
 
 get_current_step() {
-    $SSH "ls $REMOTE_DIR/checkpoints/ujamaa-3b-lora/ 2>/dev/null | grep checkpoint | tail -1" 2>/dev/null
+    $SSH "ls $REMOTE_DIR/checkpoints/ujamaa-7b-lora/ 2>/dev/null | grep checkpoint | tail -1" 2>/dev/null
 }
 
 get_loss() {
-    $SSH "tail -3 $REMOTE_DIR/logs/ujamaa-3b/*.log 2>/dev/null || echo ''" 2>/dev/null
+    $SSH "tail -3 $REMOTE_DIR/logs/ujamaa-7b/*.log 2>/dev/null || echo ''" 2>/dev/null
 }
 
 download_checkpoints() {
     log "Downloading LoRA adapter..."
-    mkdir -p "$LOCAL_SAVE/ujamaa-3b-lora"
-    $SCP -r "$RUNPOD_USER@$RUNPOD_HOST:$REMOTE_DIR/checkpoints/ujamaa-3b-lora/final" \
-        "$LOCAL_SAVE/ujamaa-3b-lora/" && log "LoRA adapter saved to $LOCAL_SAVE/ujamaa-3b-lora/final"
+    mkdir -p "$LOCAL_SAVE/ujamaa-7b-lora"
+    $SCP -r "$RUNPOD_USER@$RUNPOD_HOST:$REMOTE_DIR/checkpoints/ujamaa-7b-lora/final" \
+        "$LOCAL_SAVE/ujamaa-7b-lora/" && log "LoRA adapter saved to $LOCAL_SAVE/ujamaa-7b-lora/final"
 
     log "Downloading bridge checkpoint..."
     mkdir -p "$LOCAL_SAVE/anthos-bridge"
     $SCP "$RUNPOD_USER@$RUNPOD_HOST:$BRIDGE_SIGNAL" \
-        "$LOCAL_SAVE/anthos-bridge/bridge.pt" && log "Bridge saved to $LOCAL_SAVE/anthos-bridge/bridge.pt"
+        "$LOCAL_SAVE/anthos-bridge-7b/bridge.pt" && log "Bridge saved to $LOCAL_SAVE/anthos-bridge-7b/bridge.pt"
 }
 
 terminate_pod() {
@@ -101,7 +101,7 @@ while true; do
         download_checkpoints
 
         # Verify download succeeded
-        if [ -f "$LOCAL_SAVE/ujamaa-3b-lora/final/adapter_config.json" ]; then
+        if [ -f "$LOCAL_SAVE/ujamaa-7b-lora/final/adapter_config.json" ]; then
             log "Checkpoint verified locally."
             terminate_pod
             notify "All done. Pod terminated. Checkpoints at $LOCAL_SAVE"
